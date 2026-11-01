@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>夢の部屋たち</title>
+<style>
+  :root { --ink:#1f3540; --sub:#5b7680; }
+  html, body { margin:0; padding:0; min-height:100%; background:linear-gradient(180deg,#e6f1f6 0%,#c9e2ec 50%,#b2d6e3 100%); color:var(--ink); font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:56px 20px 80px; }
+  h1 { font-weight:300; letter-spacing:0.35em; font-size:34px; margin:0 0 6px; text-shadow:0 0 24px #fff; }
+  .lead { color:var(--sub); font-size:13px; letter-spacing:0.15em; margin-bottom:36px; line-height:1.9; }
+  .card { display:block; text-decoration:none; color:inherit; background:rgba(255,255,255,0.5); border:1px solid rgba(255,255,255,0.8); border-radius:16px; padding:22px 24px; margin:0 0 18px; box-shadow:0 10px 30px rgba(60,100,120,0.12); transition:transform .15s, box-shadow .15s; }
+  .card:hover { transform:translateY(-2px); box-shadow:0 14px 36px rgba(60,100,120,0.18); }
+  .card h2 { margin:0 0 6px; font-size:20px; font-weight:500; letter-spacing:0.12em; }
+  .card p { margin:0; color:var(--sub); font-size:13px; line-height:1.8; }
+  .card .tag { display:inline-block; font-size:11px; letter-spacing:0.1em; color:#2c5a6a; background:rgba(255,255,255,0.7); border-radius:999px; padding:2px 10px; margin-right:6px; margin-top:10px; }
+  .foot { margin-top:40px; color:var(--sub); font-size:12px; line-height:1.9; }
+  .foot a { color:#2c5a6a; }
+  @media (prefers-color-scheme: dark) { }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>夢の部屋たち</h1>
+  <div class="lead">ただ歩くだけの、どこにもない場所。<br>PC はマウスとキーボード、スマホは画面のスティックで歩けます（横向きがおすすめ）。</div>
+
+  <a class="card" href="pool/">
+    <h2>プールのシミュレーター（試作）</h2>
+    <p>白いタイルの部屋とプールが続く建物。光は本物の計算で焼き込んであり、水面は映り込み・屈折・さざ波つき。歩いたり飛び込んだりすると波が広がります。</p>
+    <span class="tag">光焼き込み</span><span class="tag">泳げる</span><span class="tag">25部屋</span>
+  </a>
+
+  <a class="card" href="playground/">
+    <h2>遊び場の夢</h2>
+    <p>誰もいない室内の遊び場。低くて黒い天井、点々と灯る照明、色あせた組み合わせマット、黄色い網のやぐら、ボールプール。緩やかな恐怖を身近に。</p>
+    <span class="tag">光焼き込み</span><span class="tag">ドリームコア</span>
+  </a>
+
+  <a class="card" href="endless/">
+    <h2>プールの夢（果てしない版）</h2>
+    <p>歩くたびに部屋が自動で生まれ、どこまでも続くプールの建物。R キーで世界を作り直せます。最初に作った版です。</p>
+    <span class="tag">無限生成</span><span class="tag">泳げる</span>
+  </a>
+
+  <div class="foot">
+    どれもブラウザだけで動きます。読み込みに少し時間がかかります。<br>
+    弟のゲームの街は <a href="https://kzgames-hokkaido.github.io/game-town/">こちら</a>。
+  </div>
+</div>
+</body>
+</html>

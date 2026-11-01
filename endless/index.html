@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>プールの夢（果てしない版）</title>
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#cfe3ee; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #c { display:block; width:100%; height:100%; }
+  #start { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; background:linear-gradient(180deg,#e3f0f6 0%,#c4e0eb 60%,#a9d2e2 100%); color:#2b4a56; cursor:pointer; z-index:10; text-align:center; }
+  #start h1 { font-weight:300; letter-spacing:0.35em; font-size:44px; margin:0 0 8px; text-shadow:0 0 24px #fff; }
+  #start .sub { font-size:13px; letter-spacing:0.3em; opacity:0.7; margin-bottom:28px; }
+  #start .click { font-size:18px; padding:12px 32px; border:1px solid rgba(43,74,86,0.4); border-radius:999px; background:rgba(255,255,255,0.45); animation:pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+  #start .keys { margin-top:30px; font-size:13px; line-height:1.9; opacity:0.8; background:rgba(255,255,255,0.35); padding:12px 24px; border-radius:12px; }
+  #start .keys b { display:inline-block; min-width:10em; text-align:right; margin-right:1em; font-weight:600; }
+  #start .note { margin-top:14px; font-size:11px; opacity:0.6; }
+  #hud { position:fixed; left:14px; bottom:12px; color:rgba(30,60,70,0.7); font-size:12px; line-height:1.7; pointer-events:none; text-shadow:0 0 6px #fff; z-index:5; transition:opacity 1s; }
+  #msg { position:fixed; top:14px; left:50%; transform:translateX(-50%); color:rgba(30,60,70,0.85); font-size:14px; letter-spacing:0.2em; text-shadow:0 0 8px #fff; opacity:0; transition:opacity 0.6s; pointer-events:none; z-index:5; }
+  .touch { display:none; }
+  body.touch .touch { display:block; }
+  #stick { position:fixed; left:30px; bottom:40px; width:130px; height:130px; border-radius:50%; background:rgba(255,255,255,0.25); border:1px solid rgba(255,255,255,0.6); z-index:6; touch-action:none; }
+  #knob { position:absolute; left:40px; top:40px; width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,0.75); }
+  #btnJump, #btnDive, #btnRun { position:fixed; right:30px; width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,0.4); border:1px solid rgba(255,255,255,0.7); z-index:6; color:#2b4a56; font-size:12px; display:flex; align-items:center; justify-content:center; touch-action:none; user-select:none; }
+  #btnJump { bottom:60px; }
+  #btnDive { bottom:140px; }
+  #btnRun { bottom:220px; right:110px; }
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<a id="backToMenu" href="../" style="position:fixed;top:10px;left:12px;z-index:20;font:12px/1 'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;letter-spacing:0.15em;color:#2b4a56;background:rgba(255,255,255,0.55);border:1px solid rgba(255,255,255,0.8);border-radius:999px;padding:7px 12px;text-decoration:none;opacity:0.85">← 一覧へ</a>
+<div id="msg"></div>
+<div id="hud"></div>
+<div id="start">
+  <h1>プールの夢</h1>
+  <div class="sub">POOL DREAM　―　果てしなく続く水の部屋</div>
+  <div class="click" id="clickToStart">クリックしてはじめる</div>
+  <div class="keys">
+    <div><b>W A S D / 矢印キー</b>歩く</div>
+    <div><b>マウス（Q / E でも）</b>見回す</div>
+    <div><b>Shift</b>走る</div>
+    <div><b>Space</b>ジャンプ ／ 泳いで上がる</div>
+    <div><b>C</b>泳いでもぐる</div>
+    <div><b>M</b>音の ON / OFF</div>
+    <div><b>P</b>画質（重いときは下げる）</div>
+    <div><b>R</b>別の場所に行く（世界を作り直す）</div>
+    <div><b>Esc</b>マウスを離す</div>
+  </div>
+  <div class="note">ヘッドホン推奨。読み込みに少し時間がかかります。</div>
+</div>
+<div id="stick" class="touch"><div id="knob"></div></div>
+<div id="btnJump" class="touch">ジャンプ</div>
+<div id="btnDive" class="touch">もぐる</div>
+<div id="btnRun" class="touch">走る</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ---------- 基本設定 ----------
+const CELL = 12;          // 1部屋の一辺(m)
+const WATER = 0.3;        // 水面の高さ
+const GEN_R = 4;          // 生成する部屋の半径(部屋数)
+const TILE = 1.2;         // タイル模様の1周期(m)
+let seed = Math.floor(Math.random() * 1e9);
+let quality = 2;          // 2:高 1:中 0:低
+
+function hash(a, b, c = 0) {
+  let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263) + Math.imul(c | 0, 1274126177) + Math.imul(seed | 0, 1013904223)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1103515245);
+  h = Math.imul(h ^ (h >>> 16), 2246822519);
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+
+// ---------- 描画の準備 ----------
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+const DPR = Math.min(devicePixelRatio, 1.5);
+renderer.setPixelRatio(DPR);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const SKY = new THREE.Color(0xd6e4ec);
+const UW_SKY = new THREE.Color(0x3f9eab);
+scene.fog = new THREE.Fog(SKY.clone(), 14, 60);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.08, 260);
+
+const hemi = new THREE.HemisphereLight(0xeef5fb, 0xd9e1e7, 1.0);
+scene.add(hemi);
+const SUN_DIR = new THREE.Vector3(0.32, 0.78, 0.47).normalize();
+const sun = new THREE.DirectionalLight(0xfff3dc, 2.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -42; sun.shadow.camera.right = 42;
+sun.shadow.camera.top = 42; sun.shadow.camera.bottom = -42;
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 170;
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.035;
+sun.shadow.radius = 3;
+scene.add(sun); scene.add(sun.target);
+
+// 空(白っぽくかすんだ空)
+const sky = new Sky();
+sky.scale.setScalar(4000);
+const su = sky.material.uniforms;
+su.turbidity.value = 12; su.rayleigh.value = 1.2; su.mieCoefficient.value = 0.02; su.mieDirectionalG.value = 0.85;
+su.sunPosition.value.copy(SUN_DIR);
+scene.add(sky);
+
+// ---------- タイルの質感(色・凹凸・つや) ----------
+function makeTileMaps(base, groutCol, n = 8) {
+  const S = 1024, w = S / n, gap = Math.round(w * 0.055);
+  const color = document.createElement('canvas'); color.width = color.height = S;
+  const g = color.getContext('2d');
+  g.fillStyle = groutCol; g.fillRect(0, 0, S, S);
+  const hgt = new Float32Array(S * S);
+  const rough = document.createElement('canvas'); rough.width = rough.height = S;
+  const rg = rough.getContext('2d');
+  rg.fillStyle = '#e6e6e6'; rg.fillRect(0, 0, S, S); // 目地はざらざら
+  for (let ty = 0; ty < n; ty++) for (let tx = 0; tx < n; tx++) {
+    const v = Math.sin(tx * 12.9898 + ty * 78.233) * 43758.5453; const r1 = v - Math.floor(v);
+    const v2 = Math.sin(tx * 39.3468 + ty * 11.135) * 24634.6345; const r2 = v2 - Math.floor(v2);
+    const d = (r1 - 0.5) * 16, warm = (r2 - 0.5) * 6;
+    const x0 = tx * w + gap, y0 = ty * w + gap, x1 = (tx + 1) * w - gap, y1 = (ty + 1) * w - gap;
+    const grad = g.createLinearGradient(x0, y0, x1, y1);
+    grad.addColorStop(0, `rgb(${base[0] + d + warm | 0},${base[1] + d | 0},${base[2] + d - warm | 0})`);
+    grad.addColorStop(1, `rgb(${base[0] + d - 6 | 0},${base[1] + d - 5 | 0},${base[2] + d - 3 | 0})`);
+    g.fillStyle = grad; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+    rg.fillStyle = r2 < 0.12 ? '#8a8a8a' : '#4a4a4a';
+    rg.fillRect(x0, y0, x1 - x0, y1 - y0);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const ex = Math.min(x - x0, x1 - 1 - x), ey = Math.min(y - y0, y1 - 1 - y);
+      const e = Math.min(ex, ey);
+      hgt[y * S + x] = Math.min(1, e / 5);
+    }
+  }
+  const img = g.getImageData(0, 0, S, S), px = img.data;
+  for (let i = 0; i < S * S; i++) {
+    const nz = (Math.random() - 0.5) * 7;
+    px[i * 4] += nz; px[i * 4 + 1] += nz; px[i * 4 + 2] += nz;
+  }
+  g.putImageData(img, 0, 0);
+  const nrm = document.createElement('canvas'); nrm.width = nrm.height = S;
+  const ng = nrm.getContext('2d');
+  const nimg = ng.createImageData(S, S), np = nimg.data;
+  const H = (x, y) => hgt[((y + S) % S) * S + ((x + S) % S)];
+  const strength = 2.2;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = (H(x + 1, y) - H(x - 1, y)) * strength, dy = (H(x, y + 1) - H(x, y - 1)) * strength;
+    let nx = -dx, ny = -dy, nzv = 1; const l = Math.hypot(nx, ny, nzv); nx /= l; ny /= l; nzv /= l;
+    const i = (y * S + x) * 4;
+    np[i] = (nx * 0.5 + 0.5) * 255; np[i + 1] = (ny * 0.5 + 0.5) * 255; np[i + 2] = (nzv * 0.5 + 0.5) * 255; np[i + 3] = 255;
+  }
+  ng.putImageData(nimg, 0, 0);
+  const mk = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t; };
+  return { map: mk(color, true), normalMap: mk(nrm, false), roughnessMap: mk(rough, false) };
+}
+const mapsWhite = makeTileMaps([236, 238, 239], '#b6bcc0');
+const mapsPool = makeTileMaps([206, 230, 232], '#93b3b7');
+
+const uTime = { value: 0 };
+const uWater = { value: WATER };
+
+// 水の下にゆらめく光(コースティクス)と、水面近くのしみ をタイルに描き足す
+function causticPatch(mat) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = uTime;
+    sh.uniforms.uWater = uWater;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWp;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWp = (modelMatrix * vec4(transformed,1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vWp;
+uniform float uTime; uniform float uWater;
+vec2 h2(vec2 p){ p = vec2(dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3))); return fract(sin(p)*43758.5453); }
+float caus(vec2 p, float t){
+  vec2 i=floor(p), f=fract(p); float d1=8.0,d2=8.0;
+  for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){
+    vec2 g=vec2(float(x),float(y)); vec2 o=h2(i+g); o=0.5+0.5*sin(t+6.2831*o);
+    vec2 r=g+o-f; float d=dot(r,r);
+    if(d<d1){d2=d1;d1=d;} else if(d<d2){d2=d;}
+  }
+  return 1.0 - smoothstep(0.0, 0.3, sqrt(d2)-sqrt(d1));
+}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+{
+  float vert = 1.0 - abs(normalize(vNormal).y);
+  float band = smoothstep(0.35, 0.0, abs(vWp.y - uWater - 0.08)) * vert;
+  diffuseColor.rgb *= 1.0 - band * 0.13;
+  if (vWp.y < uWater) {
+    float depth = uWater - vWp.y;
+    vec2 p = vWp.xz + vec2(vWp.y*0.3, 0.0);
+    float c1 = caus(p*0.7 + vec2(uTime*0.06, uTime*0.04), uTime*1.1);
+    float c2 = caus(p*0.42 + vec2(7.0 - uTime*0.05, uTime*0.07), uTime*0.8);
+    float c = c1*0.45 + c1*c2*1.4;
+    float att = exp(-depth*0.22);
+    diffuseColor.rgb *= mix(vec3(1.0), vec3(0.5,0.82,0.88), clamp(0.25 + depth*0.3, 0.0, 0.8));
+    diffuseColor.rgb += c * 0.6 * att;
+  }
+}`)
+      .replace('#include <fog_fragment>', `
+if (vWp.y < uWater) {
+  float depth = uWater - vWp.y;
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.03, 0.17, 0.21), 1.0 - exp(-max(0.0, depth - 1.5) * 0.45));
+}
+#include <fog_fragment>`);
+  };
+  mat.customProgramCacheKey = () => 'caustic';
+  return mat;
+}
+const MAT = {
+  white: causticPatch(new THREE.MeshStandardMaterial({ ...mapsWhite, roughness: 1.0, metalness: 0.0, envMapIntensity: 0.55, normalScale: new THREE.Vector2(0.6, 0.6) })),
+  pool: causticPatch(new THREE.MeshStandardMaterial({ ...mapsPool, roughness: 1.0, metalness: 0.0, envMapIntensity: 0.55, normalScale: new THREE.Vector2(0.6, 0.6) })),
+  glow: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.25, 1.95), toneMapped: false, fog: false }),
+  metal: new THREE.MeshStandardMaterial({ color: 0xcfd5d9, roughness: 0.3, metalness: 0.95, envMapIntensity: 1.0 }),
+  ring: new THREE.MeshStandardMaterial({ color: 0xe9c2c6, roughness: 0.55, metalness: 0.0 }),
+};
+const MATS = ['white', 'pool', 'glow', 'metal', 'ring'];
+
+// ---------- 水面(上から: 部屋が映り込む) ----------
+const WSIZE = 200;
+const reflector = new Reflector(new THREE.PlaneGeometry(WSIZE, WSIZE), {
+  clipBias: 0.01, textureWidth: Math.floor(innerWidth * DPR * 0.5), textureHeight: Math.floor(innerHeight * DPR * 0.5),
+});
+reflector.rotation.x = -Math.PI / 2; reflector.position.y = WATER;
+reflector.material.colorWrite = false; reflector.material.depthWrite = false; // 映り込みを計算するだけで描かない
+reflector.renderOrder = 9;
+scene.add(reflector);
+
+const waterMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.FrontSide, fog: true,
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+    uTime: uTime, uSun: { value: SUN_DIR.clone() }, uCam: { value: new THREE.Vector3() },
+    uSky: { value: new THREE.Color(0xd8e8f0) }, uDeep: { value: new THREE.Color(0x2a9db4) },
+    tRefl: { value: null }, uTexMat: { value: new THREE.Matrix4() }, uReflOn: { value: 1 },
+  }]),
+  vertexShader: `
+    uniform mat4 uTexMat;
+    varying vec3 vWp; varying vec4 vRefl;
+    #include <fog_pars_vertex>
+    void main(){
+      vec4 wp = modelMatrix * vec4(position,1.0); vWp = wp.xyz;
+      vRefl = uTexMat * vec4(position, 1.0);
+      vec4 mvPosition = viewMatrix * wp;
+      gl_Position = projectionMatrix * mvPosition;
+      #include <fog_vertex>
+    }`,
+  fragmentShader: `
+    uniform float uTime; uniform vec3 uSun; uniform vec3 uCam; uniform vec3 uSky; uniform vec3 uDeep;
+    uniform sampler2D tRefl; uniform float uReflOn;
+    varying vec3 vWp; varying vec4 vRefl;
+    #include <fog_pars_fragment>
+    float hgt(vec2 p){
+      float t = uTime;
+      return sin(p.x*1.9 + t*1.1)*0.5 + sin(p.y*1.5 - t*0.9)*0.5 + sin((p.x+p.y)*0.9 + t*0.7)*0.6
+           + sin((p.x*0.7-p.y*1.3) + t*1.3)*0.35 + sin(p.x*4.1 + p.y*3.3 + t*2.0)*0.12 + sin(p.x*7.3 - p.y*6.1 + t*2.6)*0.05;
+    }
+    void main(){
+      vec2 p = vWp.xz;
+      float e = 0.05;
+      float h0 = hgt(p), hx = hgt(p+vec2(e,0.0)), hz = hgt(p+vec2(0.0,e));
+      vec3 N = normalize(vec3(-(hx-h0)*0.075/e, 1.0, -(hz-h0)*0.075/e));
+      vec3 V = normalize(uCam - vWp);
+      float ndv = max(dot(N, V), 0.0);
+      float fr = 0.02 + 0.98 * pow(1.0 - ndv, 4.5);
+      vec2 ruv = vRefl.xy / vRefl.w + N.xz * 0.045;
+      vec3 refl = uReflOn > 0.5 ? texture2D(tRefl, ruv).rgb : uSky;
+      vec3 tint = mix(uDeep, uSky, 0.15);
+      vec3 col = mix(tint, refl, clamp(fr * 1.15, 0.0, 1.0));
+      vec3 R = reflect(-uSun, N);
+      float spec = pow(max(dot(R, V), 0.0), 220.0) * 3.0 + pow(max(dot(R, V), 0.0), 24.0) * 0.18;
+      col += vec3(1.0, 0.97, 0.9) * spec;
+      float a = mix(0.30, 0.97, clamp(fr * 1.1, 0.0, 1.0));
+      gl_FragColor = vec4(col, a);
+      #include <fog_fragment>
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+});
+const water = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE), waterMat);
+water.rotation.x = -Math.PI / 2; water.position.y = WATER; water.renderOrder = 10;
+scene.add(water);
+waterMat.uniforms.tRefl.value = reflector.getRenderTarget().texture;
+waterMat.uniforms.uTexMat.value = reflector.material.uniforms.textureMatrix.value;
+
+// 水面(下から見たとき)
+const underMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.BackSide, fog: true,
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: uTime, uCam: { value: new THREE.Vector3() }, uSun: { value: SUN_DIR.clone() } }]),
+  vertexShader: `varying vec3 vWp;
+    #include <fog_pars_vertex>
+    void main(){
+      vec4 wp = modelMatrix * vec4(position,1.0); vWp = wp.xyz;
+      vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
+      #include <fog_vertex>
+    }`,
+  fragmentShader: `uniform float uTime; uniform vec3 uCam; uniform vec3 uSun; varying vec3 vWp;
+    #include <fog_pars_fragment>
+    float hgt(vec2 p){ float t=uTime; return sin(p.x*1.9+t*1.1)*0.5+sin(p.y*1.5-t*0.9)*0.5+sin((p.x+p.y)*0.9+t*0.7)*0.6+sin((p.x*0.7-p.y*1.3)+t*1.3)*0.35; }
+    void main(){
+      vec2 p=vWp.xz; float e=0.05; float h0=hgt(p), hx=hgt(p+vec2(e,0.0)), hz=hgt(p+vec2(0.0,e));
+      vec3 N = normalize(vec3((hx-h0)*0.08/e, -1.0, (hz-h0)*0.08/e));
+      vec3 V = normalize(uCam - vWp);
+      float ndv = max(dot(N,V),0.0);
+      float win = smoothstep(0.55, 0.9, ndv);
+      vec3 skyc = vec3(0.95, 0.98, 1.0) * 1.6;
+      vec3 mirror = vec3(0.25, 0.62, 0.70);
+      vec3 col = mix(mirror, skyc, win);
+      float spec = pow(max(dot(reflect(-uSun, -N), V), 0.0), 60.0);
+      col += spec * 0.8;
+      gl_FragColor = vec4(col, mix(0.85, 0.35, win));
+      #include <fog_fragment>
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+});
+const waterUnder = new THREE.Mesh(new THREE.PlaneGeometry(WSIZE, WSIZE), underMat);
+waterUnder.rotation.x = -Math.PI / 2; waterUnder.position.y = WATER; waterUnder.renderOrder = 10; waterUnder.visible = false;
+scene.add(waterUnder);
+
+// 天窓から落ちる光の柱
+const shaftMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
+  uniforms: { uTime: uTime },
+  vertexShader: `attribute float aT; varying float vT; varying vec3 vWp;
+    void main(){ vT = aT; vec4 wp = modelMatrix * vec4(position,1.0); vWp = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`,
+  fragmentShader: `varying float vT; varying vec3 vWp; uniform float uTime;
+    void main(){
+      float e = 1.0 - vT;
+      float n = sin(vWp.x*1.7 + uTime*0.3) * sin(vWp.z*1.3 - uTime*0.2) * 0.5 + 0.5;
+      float a = (0.07 * e * e + 0.025 * e) * (0.75 + 0.5 * n);
+      gl_FragColor = vec4(vec3(1.0, 0.97, 0.9) * a, 1.0);
+    }`,
+});
+
+// ---------- 部屋の生成 ----------
+// hall(乾いた広間) shallow(浅く水が張った部屋) pool(プール) court(空が見える中庭)
+// corridor(通路) deep(深いプール) gallery(階段と2階の回廊) low(低い天井) well(底の見えない穴)
+function cellInfo(cx, cz) {
+  if (cx === 0 && cz === 0) return { type: 'hall', floor: 0.5, ceil: 6, roof: true, plain: true };
+  const r = hash(cx, cz, 1);
+  if (r < 0.17) return { type: 'hall', floor: 0.5, ceil: 6, roof: true };
+  if (r < 0.35) return { type: 'shallow', floor: 0, ceil: 6, roof: true };
+  if (r < 0.51) return { type: 'pool', floor: 0, ceil: 6, roof: true };
+  if (r < 0.61) return { type: 'court', floor: 0, ceil: 9.5, roof: false };
+  if (r < 0.74) return { type: 'corridor', floor: 0.5, ceil: 4, roof: true, along: hash(cx, cz, 2) < 0.5 ? 'x' : 'z' };
+  if (r < 0.81) return { type: 'deep', floor: 0.5, ceil: 7, roof: true };
+  if (r < 0.87) return { type: 'gallery', floor: 0.5, ceil: 7.5, roof: true };
+  if (r < 0.94) return { type: 'low', floor: 0.5, ceil: 2.7, roof: true };
+  return { type: 'well', floor: 0, ceil: 6, roof: true };
+}
+
+function worldUV(geo) {
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    if (ay >= ax && ay >= az) uv.setXY(i, x / TILE, z / TILE);
+    else if (ax >= az) uv.setXY(i, z / TILE, y / TILE);
+    else uv.setXY(i, x / TILE, y / TILE);
+  }
+  return geo;
+}
+
+class Builder {
+  constructor() { this.geos = { white: [], pool: [], glow: [], metal: [], ring: [] }; this.boxes = []; this.extra = []; this.anim = []; }
+  box(x, y, z, w, h, d, mat = 'white', solid = true) {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(x, y, z);
+    if (mat === 'white' || mat === 'pool') worldUV(g);
+    this.geos[mat].push(g);
+    if (solid) this.boxes.push({ x0: x - w / 2, x1: x + w / 2, y0: y - h / 2, y1: y + h / 2, z0: z - d / 2, z1: z + d / 2 });
+  }
+  span(x0, x1, y0, y1, z0, z1, mat = 'white', solid = true) {
+    if (x1 - x0 <= 0 || y1 - y0 <= 0 || z1 - z0 <= 0) return;
+    this.box((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, x1 - x0, y1 - y0, z1 - z0, mat, solid);
+  }
+  cyl(x, y0, y1, z, r, mat = 'white') {
+    const g = new THREE.CylinderGeometry(r, r, y1 - y0, 24);
+    g.translate(x, (y0 + y1) / 2, z);
+    worldUV(g);
+    this.geos[mat].push(g);
+    const q = r * 0.8;
+    this.boxes.push({ x0: x - q, x1: x + q, y0, y1, z0: z - q, z1: z + q });
+  }
+  stairs(x0, x1, z0, z1, top, bottom, dir) {
+    const rise = 0.26, run = 0.46, n = Math.ceil((top - bottom) / rise);
+    for (let k = 0; k < n; k++) {
+      const t = top - rise * (k + 1);
+      const a = run * k, b = run * (k + 1);
+      if (dir === '+x') this.span(x0 + a, x0 + b, bottom - 1, t, z0, z1);
+      else if (dir === '-x') this.span(x1 - b, x1 - a, bottom - 1, t, z0, z1);
+      else if (dir === '+z') this.span(x0, x1, bottom - 1, t, z0 + a, z0 + b);
+      else this.span(x0, x1, bottom - 1, t, z1 - b, z1 - a);
+    }
+  }
+  ladder(x, z, top, bottom, side) {
+    const dx = side === 'x' ? 0.45 : 0, dz = side === 'x' ? 0 : 0.45;
+    this.cylThin(x - dx, bottom, top + 0.9, z - dz);
+    this.cylThin(x + dx, bottom, top + 0.9, z + dz);
+    for (let y = bottom + 0.3; y < top + 0.3; y += 0.3) {
+      const g = new THREE.CylinderGeometry(0.03, 0.03, 0.9, 8);
+      g.rotateZ(Math.PI / 2); if (side !== 'x') g.rotateY(Math.PI / 2);
+      g.translate(x, y, z); this.geos.metal.push(g);
+    }
+    const g = new THREE.CylinderGeometry(0.035, 0.035, 1.0, 8);
+    g.rotateZ(Math.PI / 2); if (side !== 'x') g.rotateY(Math.PI / 2);
+    g.translate(x, top + 0.9, z); this.geos.metal.push(g);
+  }
+  cylThin(x, y0, y1, z) {
+    const g = new THREE.CylinderGeometry(0.035, 0.035, y1 - y0, 8);
+    g.translate(x, (y0 + y1) / 2, z); this.geos.metal.push(g);
+  }
+  // 天窓の光の柱 (穴 x0..x1, z0..z1, 天井 ct, 床 fl)
+  shaft(x0, x1, z0, z1, ct, fl) {
+    const h = ct - fl, kx = -SUN_DIR.x / SUN_DIR.y * h, kz = -SUN_DIR.z / SUN_DIR.y * h;
+    const top = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+    const pos = [], t = [], idx = [];
+    for (let i = 0; i < 4; i++) {
+      pos.push(top[i][0], ct, top[i][1]); t.push(0);
+      pos.push(top[i][0] + kx, fl, top[i][1] + kz); t.push(1);
+    }
+    for (let i = 0; i < 4; i++) {
+      const a = i * 2, b = i * 2 + 1, c = ((i + 1) % 4) * 2, d = ((i + 1) % 4) * 2 + 1;
+      idx.push(a, b, c, b, d, c);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aT', new THREE.Float32BufferAttribute(t, 1));
+    g.setIndex(idx);
+    const m = new THREE.Mesh(g, shaftMat); m.renderOrder = 11; m.frustumCulled = false;
+    this.extra.push(m);
+  }
+  // 浮き輪
+  floatRing(x, z, phase) {
+    const g = new THREE.TorusGeometry(0.5, 0.17, 12, 28);
+    g.rotateX(Math.PI / 2);
+    const m = new THREE.Mesh(g, MAT.ring); m.castShadow = true;
+    m.position.set(x, WATER + 0.02, z);
+    this.extra.push(m);
+    this.anim.push({ m, x, z, phase });
+  }
+  build() {
+    const group = new THREE.Group();
+    for (const m of MATS) {
+      if (!this.geos[m].length) continue;
+      const g = mergeGeometries(this.geos[m], false);
+      const mesh = new THREE.Mesh(g, MAT[m]);
+      mesh.castShadow = m !== 'glow';
+      mesh.receiveShadow = m !== 'glow';
+      group.add(mesh);
+      for (const x of this.geos[m]) x.dispose();
+    }
+    for (const e of this.extra) group.add(e);
+    return group;
+  }
+}
+
+function genCell(cx, cz) {
+  const B = new Builder();
+  const I = cellInfo(cx, cz);
+  const ox = cx * CELL, oz = cz * CELL, C = CELL, hx = ox + C / 2, hz = oz + C / 2;
+  const r = (k) => hash(cx, cz, 10 + k);
+  const top = I.ceil;
+
+  // ---- 床 ----
+  const poolLike = I.type === 'pool' || I.type === 'deep' || (I.type === 'court' && r(1) < 0.55);
+  if (I.type === 'well') {
+    // 浅い水の部屋の真ん中に、底の見えない四角い穴
+    const w = 1.6, bottom = -22;
+    B.span(ox, hx - w, bottom - 1.2, 0, oz, oz + C);
+    B.span(hx + w, ox + C, bottom - 1.2, 0, oz, oz + C);
+    B.span(hx - w, hx + w, bottom - 1.2, 0, oz, hz - w);
+    B.span(hx - w, hx + w, bottom - 1.2, 0, hz + w, oz + C);
+    B.span(hx - w, hx + w, bottom - 1.2, bottom, hz - w, hz + w, 'pool');
+    B.ladder(hx - w + 0.2, hz, 0, bottom + 6, 'z');
+    if (r(3) < 0.5) B.cyl(ox + 2.5, -1, top, oz + 2.5, 0.5);
+  } else if (!poolLike) {
+    B.span(ox, ox + C, I.floor - 1.2, I.floor, oz, oz + C);
+  } else {
+    const ring = I.type === 'deep' ? 1.8 : 2.5;
+    const bottom = I.type === 'deep' ? -3.4 : -2.6;
+    const f = I.floor, ix0 = ox + ring, ix1 = ox + C - ring, iz0 = oz + ring, iz1 = oz + C - ring;
+    B.span(ox, ix0, bottom - 1.2, f, oz, oz + C);
+    B.span(ix1, ox + C, bottom - 1.2, f, oz, oz + C);
+    B.span(ix0, ix1, bottom - 1.2, f, oz, iz0);
+    B.span(ix0, ix1, bottom - 1.2, f, iz1, oz + C);
+    B.span(ix0, ix1, bottom - 1.2, bottom, iz0, iz1, 'pool');
+    const dirs = ['+x', '-x', '+z', '-z'];
+    const sd = dirs[Math.floor(r(2) * 4)];
+    B.stairs(ix0, ix1, iz0, iz1, f, bottom, sd);
+    const ld = dirs[(dirs.indexOf(sd) + 1) % 4];
+    if (ld === '+x') B.ladder(ix0 + 0.2, hz, f, bottom, 'z');
+    else if (ld === '-x') B.ladder(ix1 - 0.2, hz, f, bottom, 'z');
+    else if (ld === '+z') B.ladder(hx, iz0 + 0.2, f, bottom, 'x');
+    else B.ladder(hx, iz1 - 0.2, f, bottom, 'x');
+    if (I.type === 'deep' && r(3) < 0.6) {
+      B.cyl(ox + 0.9, f, I.ceil, oz + 0.9, 0.55);
+      B.cyl(ox + C - 0.9, f, I.ceil, oz + C - 0.9, 0.55);
+      B.cyl(ox + 0.9, f, I.ceil, oz + C - 0.9, 0.55);
+      B.cyl(ox + C - 0.9, f, I.ceil, oz + 0.9, 0.55);
+    }
+    // ときどき、ひとつだけ浮き輪
+    if (r(6) < 0.22) B.floatRing(hx + (r(7) - 0.5) * 4, hz + (r(8) - 0.5) * 4, r(9) * 6.28);
+  }
+
+  // ---- 部屋ごとの中身 ----
+  if (I.type === 'hall' && !I.plain) {
+    const v = r(4);
+    if (v < 0.4) {
+      for (const sx of [-3, 3]) for (const sz of [-3, 3]) B.span(hx + sx - 0.45, hx + sx + 0.45, I.floor, top, hz + sz - 0.45, hz + sz + 0.45);
+    } else if (v < 0.65) {
+      B.cyl(hx, I.floor, top, hz, 1.3);
+    } else if (v < 0.8) {
+      B.span(hx - 2, hx + 2, I.floor, I.floor + 0.5, hz - 1, hz + 1);
+    }
+  }
+  if (I.type === 'shallow') {
+    const v = r(4);
+    if (v < 0.5) { for (const sx of [-3, 3]) for (const sz of [-3, 3]) B.cyl(hx + sx, -1, top, hz + sz, 0.6); }
+    else if (v < 0.75) { B.span(hx - 0.6, hx + 0.6, -1, top, oz + 1, oz + C - 1); }
+  }
+  if (I.type === 'court' && !poolLike) {
+    if (r(4) < 0.5) B.cyl(hx, -1, I.ceil, hz, 1.1);
+  }
+  if (I.type === 'low') {
+    // 低い天井に柱がびっしり
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      const x = ox + 2 + i * 4, z = oz + 2 + j * 4;
+      if (hash(cx, cz, 100 + i * 3 + j) < 0.8) B.span(x - 0.35, x + 0.35, I.floor, top, z - 0.35, z + 0.35);
+    }
+  }
+  if (I.type === 'gallery') {
+    const f = I.floor, rise = 0.25, run = 0.42, n = 12, ptop = f + rise * n;
+    const sx0 = ox + 1.2, sx1 = ox + 4.2;
+    for (let k = 0; k < n; k++) B.span(sx0, sx1, f - 0.8, f + rise * (k + 1), oz + 0.8 + run * k, oz + 0.8 + run * (k + 1));
+    const zend = oz + 0.8 + run * n;
+    B.span(ox, ox + 4.2, ptop - 0.45, ptop, zend, oz + C);
+    B.span(ox, ox + C, ptop - 0.45, ptop, oz + C - 4.2, oz + C);
+    B.span(ox + 4.2, ox + 4.5, ptop, ptop + 0.9, zend, oz + C - 4.2);
+    B.span(ox + 4.2, ox + C, ptop, ptop + 0.9, oz + C - 4.5, oz + C - 4.2);
+    B.cyl(ox + C - 3, f, top, oz + 3, 0.7);
+  }
+
+  // ---- 天井 ----
+  if (I.roof) {
+    const sky = (I.type === 'hall' || I.type === 'shallow' || I.type === 'well') && r(5) < 0.4;
+    const hole = I.type === 'pool' && r(5) < 0.35;
+    if (sky) {
+      B.span(ox, ox + 4, top, top + 0.6, oz, oz + C);
+      B.span(ox + 8, ox + C, top, top + 0.6, oz, oz + C);
+      B.span(ox + 4, ox + 8, top, top + 0.6, oz, oz + 4);
+      B.span(ox + 4, ox + 8, top, top + 0.6, oz + 8, oz + C);
+      B.shaft(ox + 4, ox + 8, oz + 4, oz + 8, top, Math.min(I.floor, WATER));
+    } else if (hole) {
+      B.span(ox, ox + C, top, top + 0.6, oz, hz - 0.8);
+      B.span(ox, ox + C, top, top + 0.6, hz + 0.8, oz + C);
+      B.shaft(ox + 0.5, ox + C - 0.5, hz - 0.8, hz + 0.8, top, WATER);
+    } else {
+      B.span(ox, ox + C, top, top + 0.6, oz, oz + C);
+    }
+  }
+
+  // ---- 壁(+x側と+z側だけ作る。反対側はとなりの部屋が作る) ----
+  genEdge(B, I, cellInfo(cx + 1, cz), 'x', cx, cz);
+  genEdge(B, I, cellInfo(cx, cz + 1), 'z', cx, cz);
+
+  return { group: B.build(), boxes: B.boxes, anim: B.anim };
+}
+
+function genEdge(B, A, Bi, axis, cx, cz) {
+  const C = CELL;
+  const ex = axis === 'x' ? (cx + 1) * C : cx * C;
+  const ez = axis === 'z' ? (cz + 1) * C : cz * C;
+  const ek = axis === 'x' ? hash(cx * 2 + 1, cz * 2, 50) : hash(cx * 2, cz * 2 + 1, 50);
+  const ek2 = axis === 'x' ? hash(cx * 2 + 1, cz * 2, 51) : hash(cx * 2, cz * 2 + 1, 51);
+  const topA = A.ceil, topB = Bi.ceil, top = Math.max(topA, topB);
+  const floorMax = Math.max(A.floor, Bi.floor);
+  const T = 0.3;
+  const forced = (A.type === 'corridor' && A.along !== axis) || (Bi.type === 'corridor' && Bi.along !== axis);
+  let kind;
+  if (forced) kind = ek < 0.6 ? 'full' : 'window';
+  else if (ek < 0.40) kind = 'open';
+  else if (ek < 0.66) kind = 'door';
+  else if (ek < 0.82) kind = 'window';
+  else kind = 'full';
+
+  const strip = (a0, a1, y0, y1, mat = 'white', th = T) => {
+    if (axis === 'x') B.span(ex - th / 2, ex + th / 2, y0, y1, a0, a1, mat);
+    else B.span(a0, a1, y0, y1, ez - th / 2, ez + th / 2, mat);
+  };
+  const s0 = axis === 'x' ? cz * C : cx * C, s1 = s0 + C;
+
+  if (kind === 'open') {
+    if (topA !== topB) strip(s0, s1, Math.min(topA, topB), top);
+    return;
+  }
+  if (kind === 'full') { strip(s0, s1, -5, top); return; }
+  if (kind === 'door') {
+    const w = 3.2 + ek2 * 2.5, dh = Math.min(3.3, Math.min(topA, topB) - floorMax - 0.3);
+    const c = s0 + C / 2 + (ek2 - 0.5) * 4;
+    strip(s0, c - w / 2, -5, top);
+    strip(c + w / 2, s1, -5, top);
+    strip(c - w / 2, c + w / 2, floorMax + dh, top);
+    strip(c - w / 2, c + w / 2, -5, floorMax - 0.0001);
+    return;
+  }
+  if (kind === 'window') {
+    strip(s0, s1, -5, top);
+    const low = Math.min(topA, topB);
+    const wb = Math.min(3.2, low - 2.2), wt = Math.min(wb + 2.2, low - 0.4);
+    const w = 3.5 + ek2 * 3;
+    const c = s0 + C / 2;
+    strip(c - w / 2, c + w / 2, wb, wt, 'glow', T + 0.08);
+  }
+}
+
+// ---------- 部屋の管理 ----------
+const cells = new Map();
+const pending = [];
+function key(cx, cz) { return cx + ',' + cz; }
+function ensureCells(pcx, pcz) {
+  for (let dz = -GEN_R; dz <= GEN_R; dz++) for (let dx = -GEN_R; dx <= GEN_R; dx++) {
+    const k = key(pcx + dx, pcz + dz);
+    if (!cells.has(k) && !pending.find(p => p.k === k)) pending.push({ k, cx: pcx + dx, cz: pcz + dz, d: Math.abs(dx) + Math.abs(dz) });
+  }
+  pending.sort((a, b) => a.d - b.d);
+  let n = 0;
+  while (pending.length && n < 3) {
+    const p = pending.shift();
+    if (cells.has(p.k)) continue;
+    const c = genCell(p.cx, p.cz);
+    scene.add(c.group);
+    cells.set(p.k, c);
+    shadowDirty = true;
+    n++;
+  }
+  for (const [k, c] of cells) {
+    const [cx, cz] = k.split(',').map(Number);
+    if (Math.abs(cx - pcx) > GEN_R + 1 || Math.abs(cz - pcz) > GEN_R + 1) {
+      scene.remove(c.group);
+      c.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+      cells.delete(k);
+    }
+  }
+}
+function clearCells() {
+  for (const [k, c] of cells) { scene.remove(c.group); c.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  cells.clear(); pending.length = 0;
+}
+
+// ---------- プレイヤー ----------
+const P = {
+  pos: new THREE.Vector3(CELL / 2, 1.0, CELL / 2), vel: new THREE.Vector3(),
+  yaw: 0.6, pitch: -0.05, r: 0.33, h: 1.7, eye: 1.58, onGround: false, swim: false,
+};
+const keys = {};
+const input = { mx: 0, mz: 0, run: false, jump: false, dive: false };
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyM') toggleSound();
+  if (e.code === 'KeyR') regenerate();
+  if (e.code === 'KeyP') cycleQuality();
+  if (e.code === 'Space') e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+let locked = false;
+document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvas; });
+document.addEventListener('mousemove', e => {
+  if (!locked) return;
+  P.yaw -= e.movementX * 0.002;
+  P.pitch -= e.movementY * 0.002;
+  P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch));
+});
+
+const isTouch = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches && !matchMedia('(hover: hover)').matches;
+if (isTouch) document.body.classList.add('touch');
+
+(function setupTouch() {
+  if (!isTouch) return;
+  const stick = document.getElementById('stick'), knob = document.getElementById('knob');
+  let sid = null, sx = 0, sy = 0;
+  stick.addEventListener('touchstart', e => { const t = e.changedTouches[0]; sid = t.identifier; sx = t.clientX; sy = t.clientY; e.preventDefault(); }, { passive: false });
+  stick.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) if (t.identifier === sid) {
+      let dx = t.clientX - sx, dy = t.clientY - sy; const L = Math.hypot(dx, dy), M = 45;
+      if (L > M) { dx *= M / L; dy *= M / L; }
+      knob.style.left = (40 + dx) + 'px'; knob.style.top = (40 + dy) + 'px';
+      input.mx = dx / M; input.mz = dy / M;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  const endS = e => { for (const t of e.changedTouches) if (t.identifier === sid) { sid = null; input.mx = input.mz = 0; knob.style.left = '40px'; knob.style.top = '40px'; } };
+  stick.addEventListener('touchend', endS); stick.addEventListener('touchcancel', endS);
+  let lid = null, lx = 0, ly = 0;
+  canvas.addEventListener('touchstart', e => { for (const t of e.changedTouches) if (t.clientX > innerWidth * 0.4 && lid === null) { lid = t.identifier; lx = t.clientX; ly = t.clientY; } }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) if (t.identifier === lid) { P.yaw -= (t.clientX - lx) * 0.005; P.pitch -= (t.clientY - ly) * 0.005; P.pitch = Math.max(-1.5, Math.min(1.5, P.pitch)); lx = t.clientX; ly = t.clientY; }
+    e.preventDefault();
+  }, { passive: false });
+  const endL = e => { for (const t of e.changedTouches) if (t.identifier === lid) lid = null; };
+  canvas.addEventListener('touchend', endL); canvas.addEventListener('touchcancel', endL);
+  const btn = (id, prop) => {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', e => { input[prop] = true; e.preventDefault(); }, { passive: false });
+    const off = e => { input[prop] = false; };
+    el.addEventListener('touchend', off); el.addEventListener('touchcancel', off);
+  };
+  btn('btnJump', 'jump'); btn('btnDive', 'dive'); btn('btnRun', 'run');
+})();
+
+function nearBoxes() {
+  const cx = Math.floor(P.pos.x / CELL), cz = Math.floor(P.pos.z / CELL);
+  const out = [];
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    const c = cells.get(key(cx + dx, cz + dz));
+    if (c) for (const b of c.boxes) out.push(b);
+  }
+  return out;
+}
+function overlaps(boxes, x, y, z) {
+  const r = P.r, h = P.h;
+  for (const b of boxes) {
+    if (x + r > b.x0 && x - r < b.x1 && y + h > b.y0 && y < b.y1 && z + r > b.z0 && z - r < b.z1) return b;
+  }
+  return null;
+}
+
+let sfxStep = 0;
+function updatePlayer(dt) {
+  const boxes = nearBoxes();
+  const feet = P.pos.y;
+  const inWater = feet < WATER - 0.05;
+  const deep = feet < WATER - 1.25;
+  P.swim = deep;
+
+  let mx = input.mx, mz = input.mz;
+  if (keys['KeyW'] || keys['ArrowUp']) mz -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) mz += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+  if (keys['KeyQ']) P.yaw += 1.8 * dt;
+  if (keys['KeyE']) P.yaw -= 1.8 * dt;
+  const L = Math.hypot(mx, mz); if (L > 1) { mx /= L; mz /= L; }
+  const run = keys['ShiftLeft'] || keys['ShiftRight'] || input.run;
+  const jump = keys['Space'] || input.jump;
+  const dive = keys['KeyC'] || keys['ControlLeft'] || input.dive;
+
+  let speed = run ? 5.6 : 3.2;
+  if (P.swim) speed = run ? 3.0 : 2.0; else if (inWater) speed *= 0.72;
+  const sy = Math.sin(P.yaw), cy = Math.cos(P.yaw);
+  const fx = -sy, fz = -cy, rx = cy, rz = -sy;
+  const tx = (fx * -mz + rx * mx) * speed, tz = (fz * -mz + rz * mx) * speed;
+  const accel = P.onGround ? 12 : (P.swim ? 6 : 4);
+  P.vel.x += (tx - P.vel.x) * Math.min(1, accel * dt);
+  P.vel.z += (tz - P.vel.z) * Math.min(1, accel * dt);
+
+  if (P.swim) {
+    let ty = -0.6;
+    if (jump) ty = 2.4; else if (dive) ty = -2.6;
+    if (!dive && P.pos.y + P.eye > WATER - 0.15 && !jump) ty = Math.max(ty, 0);
+    P.vel.y += (ty - P.vel.y) * Math.min(1, 5 * dt);
+  } else {
+    P.vel.y -= 18 * dt;
+    if (inWater) P.vel.y = Math.max(P.vel.y, -4);
+    if (jump && P.onGround) { P.vel.y = 6.2; P.onGround = false; }
+  }
+
+  const stepH = inWater ? 1.5 : 0.56;
+  let nx = P.pos.x + P.vel.x * dt;
+  let b = overlaps(boxes, nx, P.pos.y, P.pos.z);
+  if (b) {
+    if (b.y1 - P.pos.y <= stepH && b.y1 > P.pos.y && !overlaps(boxes, nx, b.y1 + 0.002, P.pos.z)) { P.pos.y = b.y1 + 0.002; P.pos.x = nx; if (P.swim) P.vel.y = 0; }
+    else { P.vel.x = 0; }
+  } else P.pos.x = nx;
+  let nz = P.pos.z + P.vel.z * dt;
+  b = overlaps(boxes, P.pos.x, P.pos.y, nz);
+  if (b) {
+    if (b.y1 - P.pos.y <= stepH && b.y1 > P.pos.y && !overlaps(boxes, P.pos.x, b.y1 + 0.002, nz)) { P.pos.y = b.y1 + 0.002; P.pos.z = nz; if (P.swim) P.vel.y = 0; }
+    else { P.vel.z = 0; }
+  } else P.pos.z = nz;
+  let ny = P.pos.y + P.vel.y * dt;
+  b = overlaps(boxes, P.pos.x, ny, P.pos.z);
+  const wasGround = P.onGround;
+  P.onGround = false;
+  if (b) {
+    if (P.vel.y <= 0) { if (!wasGround && P.vel.y < -5) sfxLand(Math.min(1, -P.vel.y / 10), inWater); P.pos.y = b.y1 + 0.001; P.onGround = true; P.vel.y = 0; }
+    else { P.pos.y = b.y0 - P.h - 0.001; P.vel.y = 0; }
+  } else P.pos.y = ny;
+  if (!P.onGround && P.vel.y <= 0 && overlaps(boxes, P.pos.x, P.pos.y - 0.05, P.pos.z)) P.onGround = true;
+
+  if (P.pos.y < -60) respawn();
+
+  const moving = Math.hypot(P.vel.x, P.vel.z) > 0.8;
+  if (moving && (P.onGround || inWater)) {
+    sfxStep += dt * (run ? 2.6 : 1.8);
+    if (sfxStep > 1) { sfxStep = 0; inWater ? sfxSplash(P.swim ? 0.25 : 0.5) : sfxFoot(); }
+  }
+}
+function respawn() { P.pos.set(CELL / 2, 1.0, CELL / 2); P.vel.set(0, 0, 0); }
+function regenerate() {
+  seed = Math.floor(Math.random() * 1e9);
+  clearCells(); respawn();
+  showMsg('別の場所へ');
+}
+
+// ---------- 音 ----------
+let AC = null, master = null, lowpass = null, soundOn = true, dripTimer = 0, farTimer = 20;
+function makeIR(sec, decay) {
+  const n = AC.sampleRate * sec, buf = AC.createBuffer(2, n, AC.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay) * (i < 400 ? i / 400 : 1); }
+  return buf;
+}
+function initAudio() {
+  if (AC) return;
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+  master = AC.createGain(); master.gain.value = 0.9;
+  lowpass = AC.createBiquadFilter(); lowpass.type = 'lowpass'; lowpass.frequency.value = 20000;
+  master.connect(lowpass).connect(AC.destination);
+  // 大きな室内の残響
+  const conv = AC.createConvolver(); conv.buffer = makeIR(3.2, 3.5);
+  const wet = AC.createGain(); wet.gain.value = 0.45;
+  conv.connect(wet).connect(master);
+  AC.rev = conv;
+  // 水のざわめき
+  const len = AC.sampleRate * 3, buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
+  let last = 0; for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+  const src = AC.createBufferSource(); src.buffer = buf; src.loop = true;
+  const nf = AC.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 380;
+  const ng = AC.createGain(); ng.gain.value = 0.045;
+  src.connect(nf).connect(ng).connect(master); src.start();
+  const lfo = AC.createOscillator(); lfo.frequency.value = 0.11; const lg = AC.createGain(); lg.gain.value = 0.02;
+  lfo.connect(lg).connect(ng.gain); lfo.start();
+  // 夢のようなドローン
+  const pad = AC.createGain(); pad.gain.value = 0.04;
+  const pf = AC.createBiquadFilter(); pf.type = 'lowpass'; pf.frequency.value = 480; pf.Q.value = 2;
+  pad.connect(pf).connect(master); pf.connect(conv);
+  [[110, 0], [164.8, 3], [220, -4], [329.6, 2]].forEach(([f, det]) => {
+    const o = AC.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = det;
+    const g = AC.createGain(); g.gain.value = 0.5; o.connect(g).connect(pad); o.start();
+  });
+  const plfo = AC.createOscillator(); plfo.frequency.value = 0.045; const plg = AC.createGain(); plg.gain.value = 240;
+  plfo.connect(plg).connect(pf.frequency); plfo.start();
+  // 蛍光灯のような、かすかなうなり
+  const hum = AC.createOscillator(); hum.type = 'sawtooth'; hum.frequency.value = 100;
+  const hf = AC.createBiquadFilter(); hf.type = 'bandpass'; hf.frequency.value = 2400; hf.Q.value = 6;
+  const hg = AC.createGain(); hg.gain.value = 0.006;
+  hum.connect(hf).connect(hg).connect(master); hum.start();
+  // とても低い、ゆっくり脈打つ音
+  const sub = AC.createOscillator(); sub.type = 'sine'; sub.frequency.value = 41;
+  const sg = AC.createGain(); sg.gain.value = 0.0;
+  sub.connect(sg).connect(master); sub.start();
+  const slfo = AC.createOscillator(); slfo.frequency.value = 0.02; const slg = AC.createGain(); slg.gain.value = 0.05;
+  slfo.connect(slg).connect(sg.gain); slfo.start();
+}
+function toggleSound() { soundOn = !soundOn; if (master) master.gain.value = soundOn ? 0.9 : 0; showMsg(soundOn ? '音 ON' : '音 OFF'); }
+function sfxDrip() {
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  const f = 900 + Math.random() * 1800;
+  o.frequency.setValueAtTime(f, AC.currentTime); o.frequency.exponentialRampToValueAtTime(f * 0.6, AC.currentTime + 0.12);
+  g.gain.setValueAtTime(0.0001, AC.currentTime); g.gain.exponentialRampToValueAtTime(0.1, AC.currentTime + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.35);
+  o.connect(g); g.connect(master); g.connect(AC.rev); o.start(); o.stop(AC.currentTime + 0.4);
+}
+function noiseBurst(freq, q, vol, dur, rev = 1) {
+  if (!AC) return;
+  const n = AC.sampleRate * dur, buf = AC.createBuffer(1, n, AC.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+  const s = AC.createBufferSource(); s.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+  const g = AC.createGain(); g.gain.value = vol;
+  const rg = AC.createGain(); rg.gain.value = rev;
+  s.connect(f).connect(g); g.connect(master); g.connect(rg).connect(AC.rev); s.start();
+}
+function sfxFoot() { noiseBurst(1500 + Math.random() * 700, 1.4, 0.05, 0.08); }
+function sfxSplash(v) { noiseBurst(700 + Math.random() * 500, 0.8, 0.12 * v, 0.22); }
+function sfxLand(v, water) { water ? noiseBurst(500, 0.6, 0.25 * v, 0.4) : noiseBurst(900, 1.0, 0.12 * v, 0.12); }
+// 遠くで何かが響く
+function sfxFar() {
+  if (!AC) return;
+  const t = AC.currentTime;
+  if (Math.random() < 0.45) { // 遠くで誰かが水に入ったような音
+    noiseBurst(420 + Math.random() * 300, 0.7, 0.07, 0.6, 3.0);
+    setTimeout(() => noiseBurst(900, 1.0, 0.03, 0.3, 3.0), 350 + Math.random() * 300);
+    return;
+  }
+  const o = AC.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(70 + Math.random() * 40, t); o.frequency.exponentialRampToValueAtTime(38, t + 1.8);
+  const g = AC.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
+  o.connect(g); g.connect(master); g.connect(AC.rev); o.start(t); o.stop(t + 2.5);
+  noiseBurst(220, 0.5, 0.05, 1.2, 2.5);
+}
+
+// ---------- UI ----------
+const msgEl = document.getElementById('msg');
+let msgT = null;
+function showMsg(t) { msgEl.textContent = t; msgEl.style.opacity = 1; clearTimeout(msgT); msgT = setTimeout(() => msgEl.style.opacity = 0, 1600); }
+const startEl = document.getElementById('start');
+const hudEl = document.getElementById('hud');
+let started = false;
+startEl.addEventListener('click', () => {
+  startEl.style.display = 'none';
+  started = true;
+  initAudio();
+  if (!isTouch) canvas.requestPointerLock();
+  setTimeout(() => hudEl.style.opacity = 0, 12000);
+});
+canvas.addEventListener('click', () => { if (started && !isTouch && !locked) canvas.requestPointerLock(); });
+hudEl.innerHTML = isTouch ? '左のスティックで歩く・右側をなぞって見回す' : 'W A S D 歩く ／ Shift 走る ／ Space ジャンプ・浮く ／ C もぐる ／ M 音 ／ P 画質 ／ R 別の場所へ';
+
+// ---------- 後処理(にじむ光・かげ・画面の質感) ----------
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new SSAOPass(scene, camera, innerWidth, innerHeight);
+gtao.kernelRadius = 0.5; gtao.minDistance = 0.0005; gtao.maxDistance = 0.02;
+composer.addPass(gtao);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.75, 0.9);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const grade = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uUW: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uUW; varying vec2 vUv;
+    void main(){
+      vec2 uv = vUv; vec2 d = uv - 0.5; float r2 = dot(d,d);
+      vec3 col;
+      col.r = texture2D(tDiffuse, uv + d * r2 * 0.016).r;
+      col.g = texture2D(tDiffuse, uv).g;
+      col.b = texture2D(tDiffuse, uv - d * r2 * 0.016).b;
+      col = col * 0.95 + 0.028;
+      col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))), 0.06);
+      col = mix(col, col * vec3(0.7, 1.0, 1.05), uUW);
+      col *= 1.0 - smoothstep(0.3, 1.25, length(d) * 1.35) * 0.38;
+      float g = fract(sin(dot(uv * vec2(1234.5, 987.6) + fract(uTime) * 13.7, vec2(12.9898, 78.233))) * 43758.5453);
+      col += (g - 0.5) * 0.03;
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+});
+composer.addPass(grade);
+
+function cycleQuality() {
+  quality = (quality + 2) % 3;
+  applyQuality();
+  showMsg(['画質: 低', '画質: 中', '画質: 高'][quality]);
+}
+function applyQuality() {
+  gtao.enabled = quality >= 2;
+  waterMat.uniforms.uReflOn.value = quality >= 1 ? 1 : 0;
+  reflector.visible = quality >= 1;
+  const sm = quality >= 1 ? 2048 : 1024;
+  if (sun.shadow.mapSize.x !== sm) {
+    sun.shadow.mapSize.set(sm, sm);
+    if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  }
+  const s = quality >= 2 ? 0.5 : 0.35;
+  reflector.getRenderTarget().setSize(Math.floor(innerWidth * DPR * s), Math.floor(innerHeight * DPR * s));
+  shadowDirty = true;
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  applyQuality();
+});
+
+// ---------- 影の位置合わせ ----------
+const lightRot = new THREE.Matrix4().lookAt(SUN_DIR, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0));
+const lightRotInv = lightRot.clone().invert();
+const tmpV = new THREE.Vector3();
+let shadowDirty = true, lastShadowPos = new THREE.Vector3(1e9, 0, 0);
+function updateSun() {
+  const texel = 84 / 2048;
+  tmpV.copy(P.pos).applyMatrix4(lightRotInv);
+  tmpV.x = Math.round(tmpV.x / texel) * texel;
+  tmpV.y = Math.round(tmpV.y / texel) * texel;
+  tmpV.applyMatrix4(lightRot);
+  if (tmpV.distanceTo(lastShadowPos) > 0.5) { lastShadowPos.copy(tmpV); shadowDirty = true; }
+  if (shadowDirty) {
+    sun.target.position.copy(lastShadowPos);
+    sun.position.copy(lastShadowPos).addScaledVector(SUN_DIR, 80);
+    sun.target.updateMatrixWorld();
+  }
+}
+
+// ---------- メインループ ----------
+let last = performance.now(), bob = 0, sway = 0;
+const clock = { t: 0 };
+let shadowTick = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  clock.t += dt; uTime.value = clock.t; grade.uniforms.uTime.value = clock.t;
+
+  const pcx = Math.floor(P.pos.x / CELL), pcz = Math.floor(P.pos.z / CELL);
+  ensureCells(pcx, pcz);
+
+  if (started) {
+    const sub = 3; for (let i = 0; i < sub; i++) updatePlayer(dt / sub);
+  }
+
+  // 浮き輪のゆれ
+  for (const c of cells.values()) for (const a of c.anim) {
+    a.m.position.y = WATER + 0.02 + Math.sin(clock.t * 1.1 + a.phase) * 0.03;
+    a.m.position.x = a.x + Math.sin(clock.t * 0.13 + a.phase) * 0.6;
+    a.m.position.z = a.z + Math.cos(clock.t * 0.11 + a.phase) * 0.6;
+    a.m.rotation.y = clock.t * 0.05 + a.phase;
+    a.m.rotation.x = Math.sin(clock.t * 0.9 + a.phase) * 0.05;
+  }
+
+  // カメラ
+  const moving = Math.hypot(P.vel.x, P.vel.z);
+  bob += dt * (P.onGround ? moving * 2.2 : 0);
+  sway += dt;
+  const bobY = P.onGround ? Math.sin(bob) * 0.028 * Math.min(1, moving / 3) : 0;
+  const swimY = P.swim ? Math.sin(sway * 1.3) * 0.04 : 0;
+  camera.position.set(P.pos.x, P.pos.y + P.eye + bobY + swimY, P.pos.z);
+  camera.rotation.set(0, 0, 0, 'YXZ');
+  camera.rotation.y = P.yaw; camera.rotation.x = P.pitch;
+  camera.rotation.z = (P.onGround ? Math.sin(bob * 0.5) * 0.004 * Math.min(1, moving / 3) : 0) + (P.swim ? Math.sin(sway * 0.7) * 0.02 : 0);
+
+  // 水面はプレイヤーについてくる
+  const wx = Math.round(P.pos.x / 6) * 6, wz = Math.round(P.pos.z / 6) * 6;
+  water.position.x = reflector.position.x = waterUnder.position.x = wx;
+  water.position.z = reflector.position.z = waterUnder.position.z = wz;
+  waterMat.uniforms.uCam.value.copy(camera.position);
+  underMat.uniforms.uCam.value.copy(camera.position);
+
+  // 水中かどうか
+  const uw = camera.position.y < WATER;
+  water.visible = !uw; reflector.visible = !uw && quality >= 1; waterUnder.visible = uw;
+  if (uw) {
+    const depth = WATER - camera.position.y;
+    const c = UW_SKY.clone().multiplyScalar(Math.max(0.15, 1 - depth * 0.06));
+    scene.fog.color.copy(c); scene.fog.near = 0.3; scene.fog.far = Math.max(4, 16 - depth * 0.6);
+    sky.visible = false; scene.background = c;
+    grade.uniforms.uUW.value += (1 - grade.uniforms.uUW.value) * 0.2;
+    if (lowpass) lowpass.frequency.value += (320 - lowpass.frequency.value) * 0.2;
+  } else {
+    scene.fog.color.copy(SKY); scene.fog.near = 14; scene.fog.far = 60;
+    sky.visible = true; scene.background = null;
+    grade.uniforms.uUW.value += (0 - grade.uniforms.uUW.value) * 0.2;
+    if (lowpass) lowpass.frequency.value += (20000 - lowpass.frequency.value) * 0.2;
+  }
+
+  // しずく・遠くの音
+  dripTimer -= dt;
+  if (dripTimer < 0) { dripTimer = 1.5 + Math.random() * 6; sfxDrip(); }
+  farTimer -= dt;
+  if (farTimer < 0) { farTimer = 25 + Math.random() * 50; sfxFar(); }
+
+  updateSun();
+  shadowTick += dt;
+  if (shadowDirty || shadowTick > 0.5) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; shadowTick = 0; }
+  composer.render();
+}
+applyQuality();
+requestAnimationFrame(frame);
+window.__pool = { P, regenerate, cells, cellInfo, keys, dbg: { gtao, bloom, hemi, sun, renderer, grade, waterMat, MAT, applyQuality, composer, scene, camera, reflector, water, sky, setQ: (q) => { quality = q; applyQuality(); } }, tick: (dt) => { ensureCells(Math.floor(P.pos.x / CELL), Math.floor(P.pos.z / CELL)); updatePlayer(dt); } };
+</script>
+</body>
+</html>
