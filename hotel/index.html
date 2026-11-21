@@ -30,6 +30,22 @@
   body.touch #btnRun, body.touch #btnAct { display:flex; }
   #btnRun { bottom:30px; }
   #btnAct { bottom:104px; }
+  #btnCam, #btnShot { position:fixed; right:22px; width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,0.13); border:1px solid rgba(255,255,255,0.35); z-index:6; color:#ead9b8; font-size:12px; display:none; align-items:center; justify-content:center; touch-action:none; user-select:none; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  body.touch #btnCam { display:flex; bottom:30px; }
+  body.touch.photo #btnShot { display:flex; bottom:108px; width:76px; height:76px; right:16px; background:rgba(255,255,255,0.3); border:3px solid #fff; color:#fff; }
+  /* 監視カメラ風の文字 */
+  #cctv, #finder { position:fixed; inset:0; pointer-events:none; z-index:4; font-family:"Courier New",Consolas,monospace; color:rgba(255,255,255,0.88); text-shadow:0 0 4px rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.6); font-size:17px; letter-spacing:0.08em; display:none; }
+  #cctv div, #finder div { position:absolute; }
+  #cctv .rec { left:34px; top:26px; } #cctv .rec i { display:inline-block; width:12px; height:12px; border-radius:50%; background:#e02020; margin-right:8px; box-shadow:0 0 8px #f00; animation:recblink 1.2s steps(1) infinite; }
+  @keyframes recblink { 0%,55%{opacity:1} 56%,100%{opacity:0} }
+  #cctv .cam { right:34px; top:26px; text-align:right; } #cctv .stamp { right:34px; bottom:26px; text-align:right; } #cctv .el { left:34px; top:52px; font-size:14px; opacity:0.8; }
+  .corner { width:26px; height:26px; border:2px solid rgba(255,255,255,0.7); }
+  .corner.tl { left:14px; top:14px; border-right:none; border-bottom:none; } .corner.tr { right:14px; top:14px; border-left:none; border-bottom:none; }
+  .corner.bl { left:14px; bottom:14px; border-right:none; border-top:none; } .corner.br { right:14px; bottom:14px; border-left:none; border-top:none; }
+  #finder .lab { left:34px; top:26px; } #finder .hint { left:50%; bottom:26px; transform:translateX(-50%); font-size:13px; white-space:nowrap; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #finder .cross { left:50%; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px; background:linear-gradient(#fff,#fff) center/2px 100% no-repeat, linear-gradient(#fff,#fff) center/100% 2px no-repeat; opacity:0.55; }
+  @media (max-width: 700px) { #cctv, #finder { font-size:12px; } #cctv .el { font-size:11px; top:44px; } }
+  body.hasBack #cctv .rec, body.hasBack #finder .lab { top:60px; } body.hasBack #cctv .el { top:86px; } body.hasBack .camcorner.tl, body.hasBack .corner.tl { top:48px; } @media (max-width: 700px) { body.hasBack #cctv .el { top:80px; } }
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
@@ -41,6 +57,8 @@
 <div id="msg"></div>
 <div id="prompt"></div>
 <div id="hud"></div>
+<div id="cctv"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div><div class="rec"><i></i>REC</div><div class="el" id="cctvEl">00:00:00</div><div class="cam" id="cctvCam">CAM 01  LOBBY</div><div class="stamp" id="cctvStamp"></div></div>
+<div id="finder"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div><div class="lab">PHOTO  B/W</div><div class="cross"></div><div class="hint" id="finderHint"></div></div>
 <div id="floors"><small>行き先</small><div data-f="3">3</div><div data-f="2">2</div><div data-f="1">1</div><div data-f="0">L</div></div>
 <div id="start">
   <h1>ホテルの夢</h1>
@@ -52,6 +70,9 @@
     <div><b>Shift</b>早足</div>
     <div><b>F</b>エレベーターを呼ぶ ／ 扉・呼び鈴にさわる</div>
     <div><b>0 1 2 3</b>エレベーターの行き先（0 はロビー）</div>
+    <div><b>C（K でも）</b>カメラ（白黒の写真モード）</div>
+    <div><b>Space / Enter / クリック</b>写真モードで撮る（画像が保存される）</div>
+    <div><b>V</b>監視カメラ風の表示を消す／出す</div>
     <div><b>M</b>音の ON / OFF</div>
     <div><b>P</b>画質（重いときは下げる）</div>
     <div><b>H</b>操作の表示を消す／出す</div>
@@ -62,6 +83,8 @@
 <div id="stick" class="touch"><div id="knob"></div></div>
 <div id="btnRun" class="touch">早足</div>
 <div id="btnAct" class="touch">さわる</div>
+<div id="btnCam" class="touch">カメラ</div>
+<div id="btnShot" class="touch">撮る</div>
 
 <script>
 window.__showErr = function (msg) { var el = document.getElementById('clickToStart'); if (el) { el.textContent = '開けませんでした: ' + msg; el.style.animation = 'none'; } };
@@ -664,6 +687,9 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyP') cycleQuality();
   if (e.code === 'KeyH') toggleHud();
   if (e.code === 'KeyF') act();
+  if (e.code === 'KeyC' || e.code === 'KeyK') togglePhoto();
+  if (e.code === 'KeyV') toggleCctv();
+  if ((e.code === 'Space' || e.code === 'Enter') && photoMode) { shoot(); e.preventDefault(); }
   const dg = { Digit0: 0, Digit1: 1, Digit2: 2, Digit3: 3, Numpad0: 0, Numpad1: 1, Numpad2: 2, Numpad3: 3, KeyL: 0 }[e.code];
   if (dg !== undefined && inCar()) pickFloor(dg);
 });
@@ -691,6 +717,8 @@ if (isTouch) document.body.classList.add('touch');
   run.addEventListener('touchstart', e => { input.run = true; e.preventDefault(); }, { passive: false });
   run.addEventListener('touchend', () => { input.run = false; }); run.addEventListener('touchcancel', () => { input.run = false; });
   document.getElementById('btnAct').addEventListener('touchstart', e => { act(); e.preventDefault(); }, { passive: false });
+  document.getElementById('btnCam').addEventListener('touchstart', e => { togglePhoto(); e.preventDefault(); }, { passive: false });
+  document.getElementById('btnShot').addEventListener('touchstart', e => { shoot(); e.preventDefault(); }, { passive: false });
 })();
 const floorsEl = document.getElementById('floors');
 floorsEl.querySelectorAll('div').forEach(el => { const go = e => { pickFloor(+el.dataset.f); e.preventDefault(); e.stopPropagation(); }; el.addEventListener('click', go); el.addEventListener('touchstart', go, { passive: false }); });
@@ -771,6 +799,7 @@ function noiseBurst(freq, q, vol, dur, type = 'bandpass') {
 function tone(freq, vol, dur, type = 'sine') { if (!AC) return; const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05); }
 function sfxStep(surf) { if (surf === 'marble') { noiseBurst(1700 + Math.random() * 500, 1.6, 0.035, 0.06); noiseBurst(220, 1.0, 0.03, 0.07); } else if (surf === 'wood') { noiseBurst(420 + Math.random() * 120, 1.2, 0.04, 0.08); } else { noiseBurst(190 + Math.random() * 60, 0.8, 0.028, 0.09, 'lowpass'); } }
 function sfxClick() { noiseBurst(2400, 3, 0.03, 0.03); }
+function sfxShutter() { noiseBurst(3200, 2, 0.03, 0.02); setTimeout(() => noiseBurst(1800, 2, 0.022, 0.03), 70); }
 function sfxLocked() { noiseBurst(700, 2.5, 0.04, 0.05); setTimeout(() => noiseBurst(620, 2.5, 0.03, 0.05), 110); }
 function sfxBell() { tone(2093, 0.035, 2.2); tone(4186 * 1.01, 0.012, 1.4); tone(6300, 0.006, 0.8); }
 function sfxElevStart() { noiseBurst(300, 1.5, 0.035, 0.18); }
@@ -786,7 +815,8 @@ function showMsg(t) { msgEl.textContent = t; msgEl.style.opacity = 1; clearTimeo
 function toggleHud() { hudOn = !hudOn; hudEl.style.display = hudOn ? '' : 'none'; document.body.classList.toggle('touch', hudOn && isTouch); showMsg(hudOn ? '操作表示 ON' : '操作表示 OFF（H でもどる）'); }
 startEl.addEventListener('click', () => { if (!window.__hotel) return; startEl.style.display = 'none'; started = true; initAudio(); if (!isTouch) canvas.requestPointerLock(); setTimeout(() => hudEl.style.opacity = 0, 14000); });
 canvas.addEventListener('click', () => { if (started && !isTouch && !locked) canvas.requestPointerLock(); });
-hudEl.innerHTML = isTouch ? '左のスティックで歩く・右側をなぞって見回す・「さわる」でエレベーターや扉' : 'W A S D 歩く ／ Shift 早足 ／ F さわる ／ 0〜3 エレベーターの行き先 ／ M 音 ／ P 画質 ／ H この表示を消す';
+canvas.addEventListener('mousedown', e => { if (started && locked && photoMode && e.button === 0) shoot(); });
+hudEl.innerHTML = isTouch ? '左のスティックで歩く・右側をなぞって見回す・「さわる」でエレベーターや扉・「カメラ」で白黒の写真' : 'W A S D 歩く ／ Shift 早足 ／ F さわる ／ 0〜3 エレベーターの行き先 ／ C カメラ ／ M 音 ／ P 画質 ／ H この表示を消す';
 
 // ---------- 後処理 ----------
 const composerRT = new THREE.WebGLRenderTarget(innerWidth * DPR, innerHeight * DPR, { type: THREE.HalfFloatType, samples: MSAA });
@@ -796,15 +826,43 @@ const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const grade = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uCctv: { value: 1 }, uGlitch: { value: 0 }, uSeed: { value: 0 }, uMono: { value: 0 }, uFlash: { value: 0 }, uRes: { value: new THREE.Vector2(1280, 720) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uCctv; uniform float uGlitch; uniform float uSeed; uniform float uMono; uniform float uFlash; uniform vec2 uRes; varying vec2 vUv;
+    float h1(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
-      vec2 uv = vUv; vec2 d = uv - 0.5; float r2 = dot(d, d);
-      vec3 col; col.r = texture2D(tDiffuse, uv + d * r2 * 0.012).r; col.g = texture2D(tDiffuse, uv).g; col.b = texture2D(tDiffuse, uv - d * r2 * 0.012).b;
-      col *= 1.0 - smoothstep(0.3, 1.25, length(d) * 1.3) * 0.46;
-      float g = fract(sin(dot(uv * vec2(1234.5, 987.6) + fract(uTime) * 13.7, vec2(12.9898, 78.233))) * 43758.5453);
-      col += (g - 0.5) * 0.028;
+      vec2 c0 = vUv - 0.5;
+      // 監視カメラの広角レンズ: ふちが少し丸くゆがむ
+      vec2 uv = 0.5 + c0 * (1.0 + uCctv * 0.11 * dot(c0, c0)) * (1.0 - uCctv * 0.05);
+      // ごくまれな映像の乱れ: 横の帯がずれる・全体が少し上下にとぶ
+      float band = floor(uv.y * 26.0 + uSeed * 7.0), bh = h1(vec2(band, floor(uSeed * 37.0)));
+      uv.x += (bh - 0.5) * 0.16 * uGlitch * step(0.5, bh);
+      uv.y += (h1(vec2(floor(uSeed * 29.0), 3.0)) - 0.5) * 0.03 * uGlitch;
+      // 写真モード: 昔のカメラのように、細部がつぶれたあらい絵にする(たて 250 ますぶん)
+      vec2 grid = vec2(uRes.x / uRes.y, 1.0) * 250.0;
+      uv = mix(uv, (floor(uv * grid) + 0.5) / grid, step(0.5, uMono));
+      vec2 d = uv - 0.5; float r2 = dot(d, d), ca = 0.012 + 0.03 * uGlitch;
+      vec3 col; col.r = texture2D(tDiffuse, uv + d * r2 * ca + vec2(0.006 * uGlitch, 0.0)).r; col.g = texture2D(tDiffuse, uv).g; col.b = texture2D(tDiffuse, uv - d * r2 * ca - vec2(0.006 * uGlitch, 0.0)).b;
+      if (uMono > 0.5) { vec2 o = 0.7 / grid; vec3 b = texture2D(tDiffuse, uv + o).rgb + texture2D(tDiffuse, uv + vec2(-o.x, o.y)).rgb + texture2D(tDiffuse, uv + vec2(o.x, -o.y)).rgb + texture2D(tDiffuse, uv - o).rgb; col = mix(col, b * 0.25, 0.55); }   // ピントの甘さ
+      col *= 1.0 - smoothstep(0.3, 1.25, length(d) * 1.3) * (0.46 + 0.12 * uCctv);
+      float lum = dot(col, vec3(0.299, 0.587, 0.114));
+      // 監視カメラらしい色: 少しあせて、黒がわずかに浮く。走査線
+      col = mix(col, vec3(lum), 0.16 * uCctv); col = col * (1.0 - 0.03 * uCctv) + 0.012 * uCctv;
+      col *= 1.0 - uCctv * 0.085 * (0.5 + 0.5 * sin(gl_FragCoord.y * 3.14159));
+      // 白黒の写真
+      float bw = smoothstep(0.02, 0.95, pow(clamp(lum, 0.0, 1.0), 0.85));                       // 強いコントラスト(黒がつぶれ、白がとぶ)
+      bw *= 1.0 - smoothstep(0.25, 0.95, length(c0) * 1.25) * 0.45;                              // 周辺が暗く落ちる
+      float gr = h1(floor(gl_FragCoord.xy / 2.0) + floor(uTime * 12.0) * 7.31);                  // あらい粒
+      bw += (gr - 0.5) * 0.24 * (0.4 + 0.6 * (1.0 - abs(bw * 2.0 - 1.0)));
+      float speck = step(0.9988, h1(floor(vUv * vec2(120.0, 90.0)) + floor(uTime * 0.7) * 3.1)); bw = mix(bw, 0.07, speck * 0.8);   // ほこり
+      float sx = h1(vec2(floor(uTime * 0.5), 9.0)); bw += 0.13 * (1.0 - smoothstep(0.0, 0.0016, abs(vUv.x - sx))) * step(0.55, h1(vec2(floor(uTime * 0.5), 4.0)));   // たての細いきず
+      col = mix(col, vec3(bw), uMono);
+      // ざらつき。乱れのときは砂あらしの帯
+      float g = h1(vUv * vec2(1234.5, 987.6) + fract(uTime) * 13.7);
+      col += (g - 0.5) * (0.028 + 0.022 * uCctv + 0.02 * uMono);
+      float snow = h1(floor(vUv * vec2(320.0, 240.0)) + fract(uTime * 7.0) * 91.0);
+      col = mix(col, vec3(snow), uGlitch * (0.18 + 0.6 * step(0.82, bh)));
+      col += uFlash;
       gl_FragColor = vec4(col, 1.0);
     }`,
 });
@@ -812,6 +870,50 @@ composer.addPass(grade);
 function cycleQuality() { quality = (quality + 2) % 3; applyQuality(); showMsg(['画質: 低', '画質: 中', '画質: 高'][quality]); }
 function applyQuality() { bloom.enabled = quality >= 1; renderer.setPixelRatio(quality >= 2 ? DPR : Math.min(DPR, 1.0)); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); }
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); applyQuality(); });
+
+// ---------- 監視カメラ風の表示と、白黒の写真モード ----------
+const cctvEl = document.getElementById('cctv'), finderEl = document.getElementById('finder'), cctvCam = document.getElementById('cctvCam'), cctvStamp = document.getElementById('cctvStamp'), cctvElapsed = document.getElementById('cctvEl');
+if (document.getElementById('backToMenu')) document.body.classList.add('hasBack');
+let cctvOn = true, photoMode = false, wantShot = false, flash = 0, glitchT = 0, glitchDur = 0.3, nextGlitch = 30 + Math.random() * 40, recT = 0, lastStamp = '';
+const p2 = (n) => String(n).padStart(2, '0');
+function camLabel() {
+  if (inCar()) return 'CAM 09  LIFT';
+  const z = zoneOf(), n = z ? z.name : 'lobby';
+  if (n === 'lobby') return 'CAM 01  LOBBY';
+  if (n.startsWith('stair')) { const i = +n.slice(5); return `CAM 0${2 + i}  STAIRS ${i === 0 ? 'GF' : i + 'F'}`; }
+  if (n.startsWith('cor')) return `CAM 1${n.slice(3)}  CORRIDOR ${n.slice(3)}F`;
+  const fl = +n[4], side = n[5], k = +n.slice(6); return `CAM 2${fl}  ROOM ${fl * 100 + (side === 'N' ? 1 : 2) + k * 2}`;
+}
+function toggleCctv() { cctvOn = !cctvOn; showMsg(cctvOn ? '監視カメラ風 ON' : '監視カメラ風 OFF（V でもどる）'); }
+function togglePhoto() {
+  if (!started) return;
+  photoMode = !photoMode; document.body.classList.toggle('photo', photoMode);
+  document.getElementById('btnCam').textContent = photoMode ? 'もどる' : 'カメラ';
+  showMsg(photoMode ? '写真モード（白黒）' : '写真モードを終わった');
+}
+function shoot() { if (started && photoMode) wantShot = true; }
+function savePhoto() {
+  // いま描いた画面をそのまま画像にして保存する
+  const c2 = document.createElement('canvas'); c2.width = canvas.width; c2.height = canvas.height; c2.getContext('2d').drawImage(canvas, 0, 0);
+  const d = new Date(), name = `ホテルの夢_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.png`;
+  c2.toBlob(b => { if (!b) { showMsg('保存できませんでした'); return; } const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 8000); showMsg('写真を保存した'); window.__lastPhoto = { name, size: b.size }; }, 'image/png');
+}
+function updateCamera(dt) {
+  const U = grade.uniforms, cc = cctvOn && !photoMode;
+  U.uRes.value.set(canvas.width, canvas.height);
+  U.uCctv.value += ((cc ? 1 : 0) - U.uCctv.value) * Math.min(1, dt * 6); U.uMono.value += ((photoMode ? 1 : 0) - U.uMono.value) * Math.min(1, dt * 8);
+  // 映像の乱れは、ごくまれに(30〜70秒に1回、0.15〜0.5秒)
+  if (started && cc) { nextGlitch -= dt; if (nextGlitch <= 0) { nextGlitch = 30 + Math.random() * 40; glitchDur = 0.15 + Math.random() * 0.35; glitchT = glitchDur; } }
+  if (glitchT > 0) { glitchT -= dt; U.uGlitch.value = cc ? Math.min(1, Math.sin(Math.max(0, glitchT) / glitchDur * Math.PI) * 1.4) : 0; U.uSeed.value = Math.random(); } else U.uGlitch.value = 0;
+  flash = Math.max(0, flash - dt * 4.5); U.uFlash.value = flash * flash * 0.9;
+  cctvEl.style.display = (started && cc) ? 'block' : 'none'; finderEl.style.display = (started && photoMode) ? 'block' : 'none';
+  if (started) recT += dt;
+  if (started && cc) {
+    const d = new Date(), st = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}  ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+    if (st !== lastStamp) { lastStamp = st; cctvStamp.textContent = st; cctvCam.textContent = camLabel(); const t = Math.floor(recT); cctvElapsed.textContent = `${p2(Math.floor(t / 3600))}:${p2(Math.floor(t / 60) % 60)}:${p2(t % 60)}`; }
+  }
+}
+document.getElementById('finderHint').textContent = isTouch ? '「撮る」で保存 ・「もどる」で終わる' : 'Space / クリックで撮る ・ C でもどる';
 
 // ---------- 明るさ: いまいる場所に目が慣れる ----------
 function zoneOf() {
@@ -865,12 +967,15 @@ function frame(now) {
   promptEl.textContent = pr; promptEl.style.opacity = pr ? 1 : 0;
   floorsEl.style.display = (started && inCar() && elev.state !== 'moving') ? 'flex' : 'none';
   floorsEl.querySelectorAll('div').forEach(el => el.classList.toggle('on', +el.dataset.f === elev.floor));
+  updateCamera(dt);
+  if (wantShot) { grade.uniforms.uFlash.value = 0; grade.uniforms.uGlitch.value = 0; grade.uniforms.uMono.value = 1; }
   composer.render();
+  if (wantShot) { wantShot = false; savePhoto(); flash = 1; sfxShutter(); }
 }
 applyQuality();
 requestAnimationFrame(frame);
 document.getElementById('clickToStart').textContent = 'クリックしてはじめる';
-window.__hotel = { P, keys, elev, MF, act, pickFloor, elevCall, tick: (dt) => { updatePlayer(dt); updateElevator(dt); if (inCar() && elev.state === 'moving') { P.pos.y = elev.y; P.vy = 0; } }, dbg: { THREE, renderer, scene, camera, composer, bloom, cellMesh, probeInfo, allMats, uExposure, uEnvOn, MATS, TEX } };
+window.__hotel = { P, keys, elev, MF, act, pickFloor, elevCall, togglePhoto, toggleCctv, shoot, camLabel, cam: { glitch: (d = 0.4) => { glitchDur = d; glitchT = d; }, state: () => ({ cctvOn, photoMode, nextGlitch }) }, grade, tick: (dt) => { updatePlayer(dt); updateElevator(dt); if (inCar() && elev.state === 'moving') { P.pos.y = elev.y; P.vy = 0; } }, dbg: { THREE, renderer, scene, camera, composer, bloom, cellMesh, probeInfo, allMats, uExposure, uEnvOn, MATS, TEX } };
 </script>
 </body>
 </html>
